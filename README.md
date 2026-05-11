@@ -107,3 +107,108 @@ Runs independently for every symbol with an open Alpaca position:
 - COT is weekly (Friday release); cache invalidates on the next Friday only.
 - All entries use Alpaca **bracket** orders so a stop/target are live the moment
   the parent fills.
+
+## Dashboard
+
+A Streamlit dashboard visualizes recent signals, COT data, and price history:
+
+```bash
+streamlit run dashboard.py --server.port 8502
+```
+
+Opens at `http://localhost:8502`. Reads from `lwbot_journal.csv`, live yfinance
+prices, and the cached COT. Refresh the page to update (cached: 60s journal,
+5min prices, 15min COT).
+
+> Note: the dashboard currently focuses on GLD. Extending it to render the new
+> ETF symbols is on the TODO list.
+
+## Windows Task Scheduler (.bat files)
+
+Two wrappers are provided to run the bot from Windows Task Scheduler without
+keeping `main.py` alive as a long-running process:
+
+| File              | Equivalent to            | Schedule suggestion       |
+|-------------------|--------------------------|---------------------------|
+| `run_scan.bat`    | `python main.py scan`    | Daily 16:15 ET, Mon–Fri   |
+| `run_monitor.bat` | `python main.py monitor` | Daily 09:31 ET, Mon–Fri   |
+
+Both `cd` into the project directory and append stderr to `task_stderr.log`.
+Edit the hardcoded `C:\Python314\python.exe` path to match your install.
+
+## Adding a new ticker
+
+Three dicts in `config.py` are the only thing to edit — the scan loop picks up
+new symbols automatically from `SEASONAL_WINDOWS_BY_SYMBOL.keys()`:
+
+```python
+SEASONAL_WINDOWS_BY_SYMBOL["XLK"] = [("11-01", "04-30"), ("09-25", "10-15")]
+WILLIAMS_R_PERIOD["XLK"] = 14
+STOP_LOSS_PCT["XLK"]     = 0.05
+```
+
+That's it. Next `python main.py scan` will include the new symbol with COT
+auto-passing and Williams %R as the trigger. To add a *non-ETF* with COT data
+(like another futures-backed product), you'd need a new entry in `data.py`
+analogous to `COT_GOLD_CODE` plus branching in `signal_scan`.
+
+## Journal schema
+
+`lwbot_journal.csv` columns (one row per scan or trade action):
+
+| Column         | Description                                          |
+|----------------|------------------------------------------------------|
+| `timestamp`    | UTC ISO 8601 — when the row was written              |
+| `event`        | `scan`, `scan_error`, `entry_submitted`, `bailout_exit`, `time_stop`, `seasonal_close`, `stop_to_breakeven` |
+| `symbol`       | Ticker scanned                                       |
+| `date`         | Trading date (UTC)                                   |
+| `seasonal_pass`, `cot_pass`, `trend_pass`, `trigger_pass` | Boolean filter outcomes |
+| `signal`       | `BUY` or `FLAT`                                      |
+| `entry_price`, `stop_price`, `target_price` | Trade prices when signal=BUY    |
+| `shares`       | Sized position                                       |
+| `atr14`        | ATR(14) at scan time                                 |
+| `notes`        | Free-form (error messages, exit reasons)             |
+
+Load in pandas: `pd.read_csv("lwbot_journal.csv", parse_dates=["timestamp"])`.
+
+## Backtesting
+
+**There is no backtest harness in this repo.** Paper-trade first. The filter
+functions in `filters.py` are pure (take a `price_df`, return bool) and can be
+driven by historical bars to roll a backtest yourself, but that scaffolding
+isn't included.
+
+## Requirements
+
+- **Python 3.10+** (uses `date | None` union syntax)
+- Key dependencies (full list in `requirements.txt`):
+  - `alpaca-py` — broker integration
+  - `yfinance` — daily OHLCV
+  - `ta` — EMA, ATR, Williams %R
+  - `apscheduler` — cron scheduling
+  - `cot-reports` — CFTC COT (with direct-CFTC fallback in `data.py`)
+  - `streamlit`, `plotly` — dashboard
+  - `python-dotenv` — `.env` loader
+
+## Troubleshooting
+
+| Symptom                                                     | Likely cause / fix                                                              |
+|-------------------------------------------------------------|---------------------------------------------------------------------------------|
+| `No price data returned for <SYMBOL>`                       | Weekend or market holiday — yfinance returns empty. Retry after the next close. |
+| `Insufficient price history for EMA/ATR/Williams %R`        | Lookback too short (default 400d). Bump `lookback_days` in `data.py`.            |
+| yfinance returns MultiIndex columns and filters fail        | Handled by `data.py:21–22`. If it regresses, check yfinance version.            |
+| Alpaca 401 / `account_equity` error                         | Bad keys or hitting live URL with paper keys. Verify `.env` and `PAPER_TRADING`. |
+| COT cache looks stale                                       | Cache refreshes Fridays. Force reload: `data.fetch_cot(force=True)`.            |
+| `signal_scan('XLK')` KeyError on stop                       | Symbol not in `STOP_LOSS_PCT`. Add it to all three config dicts (see above).    |
+
+## License & disclaimer
+
+**No license file is included** — treat as proprietary/unlicensed until you
+add one.
+
+This software is provided **as-is for educational purposes only**. It is not
+financial advice. Trading involves substantial risk of loss. The author(s)
+make no warranty about correctness, profitability, or suitability for any
+purpose. **You are solely responsible** for any orders this bot submits,
+paper or live. Backtest, paper-trade, and review the code before flipping
+`PAPER_TRADING = False`.
