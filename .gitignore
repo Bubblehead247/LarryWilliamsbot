@@ -4,3 +4,6 @@
 __pycache__/
 *.pyc
 .venv/
+
+# Large historical COT archive — kept locally for backtests only
+FUT86_16.txt
