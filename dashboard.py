@@ -227,7 +227,7 @@ with left:
                                  line=dict(color="orange", width=2)))
         fig.update_layout(height=400, xaxis_rangeslider_visible=False,
                           margin=dict(l=0, r=0, t=10, b=0))
-        st.plotly_chart(fig, use_container_width=True)
+        st.plotly_chart(fig, width="stretch")
 
 with right:
     if IS_ETF and prices is not None:
@@ -244,7 +244,7 @@ with right:
                       annotation_text="overbought (-20)")
         fig.update_layout(height=400, yaxis_range=[-100, 0],
                           margin=dict(l=0, r=0, t=10, b=0))
-        st.plotly_chart(fig, use_container_width=True)
+        st.plotly_chart(fig, width="stretch")
     elif cot is not None:
         st.subheader("COT Commercial Index (52w percentile)")
         net = cot["net"].dropna()
@@ -257,7 +257,7 @@ with right:
                       annotation_text=f"threshold {config.COT_THRESHOLD}")
         fig.update_layout(height=400, yaxis_range=[0, 100],
                           margin=dict(l=0, r=0, t=10, b=0))
-        st.plotly_chart(fig, use_container_width=True)
+        st.plotly_chart(fig, width="stretch")
 
 
 st.divider()
@@ -285,7 +285,7 @@ if not journal_sym.empty:
                        ticktext=[c.replace("_pass", "") for c in cats]),
             margin=dict(l=0, r=0, t=10, b=0), showlegend=False,
         )
-        st.plotly_chart(fig, use_container_width=True)
+        st.plotly_chart(fig, width="stretch")
     else:
         st.info(f"No scan entries for {symbol} yet")
 else:
@@ -295,7 +295,7 @@ st.subheader(f"Recent {symbol} journal entries")
 if not journal_sym.empty:
     st.dataframe(
         journal_sym.sort_values("timestamp", ascending=False).head(25),
-        use_container_width=True, hide_index=True,
+        width="stretch", hide_index=True,
     )
 
 st.divider()
@@ -352,7 +352,7 @@ with left2:
                      range=[pd.Timestamp(today.year, 1, 1),
                             pd.Timestamp(today.year, 12, 31)])
     fig.update_layout(height=120, margin=dict(l=0, r=0, t=10, b=0))
-    st.plotly_chart(fig, use_container_width=True)
+    st.plotly_chart(fig, width="stretch")
 
 with right2:
     st.subheader("Schedule")
